@@ -1,4 +1,4 @@
-name: Master Publish
+name: Arkangel Dispatch
 
 on:
   workflow_dispatch:
@@ -7,11 +7,15 @@ on:
         description: 'changelogs'
         required: true 
         type: string
-
+        
+concurrency: 
+  group: production
+  cancel-in-progress: true
+  
 jobs:
   build:
     runs-on: windows-latest
-
+    environment: github-publish
     steps:
       - uses: actions/checkout@v2
         with:
@@ -112,8 +116,8 @@ jobs:
           asset_name: WFBot-Linux.7z
           asset_content_type: application/x-7z-compressed
   docker-publish:
-    
     runs-on: ubuntu-latest
+    environment: docker-publish
     needs: build
     steps:
       
@@ -129,6 +133,11 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Use Custom Dockerfile
+        run: |
+          rm Dockerfile
+          cp .github/Dockerfile .
+        
       - name: Build and push
         uses: docker/build-push-action@v2
         with:
