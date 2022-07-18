@@ -85,6 +85,7 @@ $ ./mcl-installer-1.0.7-linux-amd64
 
 6. 目录会生成 OneBotConfig.json,打开配置好保存.
    更改以下内容:
+   
    ![](images/QQ%E6%88%AA%E5%9B%BE20220621232534.png)
 
 7.请在 WFBot 文件夹下找到 WFConfig.json, 修改以下的内容
