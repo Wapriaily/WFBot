@@ -84,10 +84,11 @@ $ ./mcl-installer-1.0.7-linux-amd64
 5. 终端输入dotnet WFBot.dll启动 WFBot.dll，等待加载，然后关闭.
 
 6. 目录会生成 OneBotConfig.json,打开配置好保存.
-   更改以下内容:  
+   更改以下内容:
    ![](images/QQ%E6%88%AA%E5%9B%BE20220621232534.png)
-   
+
 7.请在 WFBot 文件夹下找到 WFConfig.json, 修改以下的内容
+
    ![](images/QQ%E6%88%AA%E5%9B%BE20220621224330.png)  
    将后面的数字 5 修改为你想使用的聊天平台的对应数字序号, 对应表如下  
 | 数字序号 | 通讯协议    | 支持平台    |
