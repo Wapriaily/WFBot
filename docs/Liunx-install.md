@@ -16,8 +16,10 @@
 
 首先新建两个文件夹, 分别叫 WFBot 和 mirai _并不一定非得是这个名字, 仅以方便演示为主_
 
+本教程使用的Onebot插件，如需使用mirai-api-http2.0+插件请参考普通部署教程 
+
 ## 第一步: 配置 mirai
-> mirai 安装教程可能较旧. 总体上来说你需要的只有登录上 mirai 和 mirai-api-http 插件. 
+> mirai 安装教程可能较旧. 总体上来说你需要的只有登录上 mirai 和 Onebot 插件.
 
 1. 进入 mirai 文件夹.
 
@@ -44,13 +46,24 @@ $ ./mcl-installer-1.0.7-linux-amd64
 > - **替换方式建议使用手机下载 [ MiraiAndroid](https://github.com/mzdluo123/MiraiAndroid/releases)**
 > - **安装好MiralAndroid后启动，在软件右上角登录QQ（这里需要给软件打开通知栏权限），登录后在左边菜单里下载device.json文件上传替换deviceInfo.json文件即可**
    
-6. 下载 [mirai-api-http](https://github.com/project-mirai/mirai-api-http/releases) 插件 (中国下载可能较慢), 将下载好的 mirai-api-http-vx.x.x.mirai.jar 放入 plugins 文件夹.
+6. 下载 [OneBot](https://github.com/yyuueexxiinngg/onebot-kotlin/releases) 插件 (中国下载可能较慢), 将下载好的 onebot-mirai-x.x.x-all.jar 放入 plugins 文件夹.
 
-7. 再次运行mcl启动 mirai 并等待输出，这次我们不会报错了，关闭 mirai，这里我们的config文件夹里会生成net.mamoe.mirai-api-http文件夹.
+7. 再次运行mcl启动 mirai 并等待输出，这次我们不会报错了，关闭 mirai，这里我们的config文件夹里会生成onebot的配置文件夹.
 
-8. 打开 net.mamoe.mirai-api-http文件夹里的 setting.yml 文件. 将 `port` (端口号, 不能大于 65536) 和 `authKey` (连接用密码, 至少 8 位) 修改为一个独特的内容. (后面配置 WFBot 会用到)
+8. 修改onebot文件夹里的配置文件.
  
- ![image](https://user-images.githubusercontent.com/52833112/125391568-4c268a00-e3d7-11eb-84ff-a77a0065e494.png)
+   > OneBotConnector 基于的是 [OneBot](https://github.com/botuniverse/onebot-11) 协议给出的正向 WebSocket 通讯方案  
+   > 你需要配置三样东西: AccessToken, 地址, 端口  
+   > AccessToken 类似密码, 是你的 OneBot 机器人和 WFBot 通信时鉴权需要, 可随意选取.  
+   > 地址和端口是 OneBot 机器人所提供 WebSocket 连接的地址, 如无特殊需求基本上可以保持默认.  
+   > 具体每种 OneBot 机器人如何修改这三样东西可以查询它们给出的教程, 这里简单举个例子.
+
+   以 OneBot Mirai 插件的配置文件作为例子, 修改这几行配置文件  
+   ![](images/QQ%E6%88%AA%E5%9B%BE20220621231503.png)
+   
+   ![](images/QQ截图20211110000226.png)  
+   改好后重启 Mirai, 等待那堆绿绿的输出.  
+   ![](images/QQ截图20220619213108.png)
 
 9. 运行mcl启动 mirai.
 
@@ -62,20 +75,29 @@ $ ./mcl-installer-1.0.7-linux-amd64
 
 2. 进入 WFBot 文件夹
 
-3. 下载 WFBot: [链接](https://github.com/TRKS-Team/WFBot/releases/latest). 你需要下载这两个东西:WFBot-Connector-MiraiConnector.7z和WFBot-Linux.7z
+3. 下载 WFBot: [链接](https://github.com/TRKS-Team/WFBot/releases/latest). 你需要下载这个东西:WFBot-Linux.7z
 
-4. 解压: 把 WFBot-Liunx.7z 直接解压, 接着把 WFBot-Connector-MiraiConnector.7z 解压后将文件夹名改为 WFBotConnector 放入WFBot-Liunx根目录内. 
-   (确保 MiraiHTTPConnector.dll 直接在 WFBotConnector 内)
+4. 解压: 把 WFBot-Liunx.7z 直接解压放入WFBot-Liunx根目录内.
    (如没有安装.7z解压命令需自行安装或在自行更改压缩类型）
    > - **最新版本不支持社区黑话词典，如需使用黑话词典请下载463版本的WFBot**
 
 5. 终端输入dotnet WFBot.dll启动 WFBot.dll，等待加载，然后关闭.
 
-6. 目录会生成 MiraiConfig.json,打开配置好保存.
+6. 目录会生成 OneBotConfig.json,打开配置好保存.
+   更改以下内容:  
+   ![](images/QQ%E6%88%AA%E5%9B%BE20220621232534.png)
+   
+7.请在 WFBot 文件夹下找到 WFConfig.json, 修改以下的内容
+   ![](images/QQ%E6%88%AA%E5%9B%BE20220621224330.png)  
+   将后面的数字 5 修改为你想使用的聊天平台的对应数字序号, 对应表如下  
+| 数字序号 | 通讯协议    | 支持平台    |
+|----------|-------------|-------------|
+| 0        | OneBot      | Mirai等     |
+| 1        | 开黑啦      | 开黑啦(WIP) |
+| 2        | QQ频道      | QQ频道(WIP) |
+| 3        | MiraiHTTPv2 | Mirai       |
 
-![image](https://user-images.githubusercontent.com/52833112/131825165-6af434ce-0bfe-408c-a2e7-f932bef685fb.png)
-
-7. 再次运行 WFBot.dll, 就成功啦.
+8. 再次运行 WFBot.dll, 就成功啦.
 
 ### 注意事项
 > - **注意你得先打开 mirai, 再打开 WFBot，并保持运行状态**
