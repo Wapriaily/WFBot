@@ -67,6 +67,9 @@
     <Reference Include="PininSharp">
       <HintPath>Dll\PininSharp.dll</HintPath>
     </Reference>
+    <Reference Include="SuffixTreeSharp">
+      <HintPath>Dll\SuffixTreeSharp.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
   <!--

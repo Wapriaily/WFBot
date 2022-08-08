@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using GammaLibrary.Extensions;
 using PininSharp;
 using PininSharp.Searchers;
+using SuffixTreeSharp;
 using WFBot.Features.Resource;
 using WFBot.Features.Utils;
 using WFBot.Utils;
@@ -30,6 +31,8 @@ namespace WFBot.Features.Common
         private WildcardAndSlang was => WFResources.WildcardAndSlang;
         private Sale[] sales => WFResources.WFBotTranslateData.Sale;
         private TreeSearcher<Sale> _searcher = new TreeSearcher<Sale>(SearcherLogic.Contain, PinIn.CreateDefault());
+        private GeneralizedSuffixTree _tree = new GeneralizedSuffixTree();
+        private Dictionary<int, Sale> TreeSalesDic = new Dictionary<int, Sale>();
 
 
         public static async Task<WildCardSearcher> Create()
@@ -45,7 +48,11 @@ namespace WFBot.Features.Common
             return obj;
         }
 
-        public List<Sale> Search(string text)
+        public List<Sale> SuffixSearch(string text)
+        {
+            return _tree.Search(text.Format()).Select(t => TreeSalesDic[t]).Distinct().ToList();
+        }
+        public List<Sale> PininSearch(string text)
         {
             return _searcher.Search(text.Format()).Distinct().ToList();
         }
@@ -55,6 +62,7 @@ namespace WFBot.Features.Common
             Console.WriteLine("开始黑话辞典刷新");
             sw.Start();
             _searcher = new TreeSearcher<Sale>(SearcherLogic.Contain, PinIn.CreateDefault());
+            _tree = new GeneralizedSuffixTree();
             
             var cacheToken = JsonSerializer.Serialize(sales, new JsonSerializerOptions() { WriteIndented = false }).SHA2().ToHexString() +
                              JsonSerializer.Serialize(was, new JsonSerializerOptions() { WriteIndented = false }).SHA2().ToHexString();
@@ -75,13 +83,20 @@ namespace WFBot.Features.Common
             {
                 foreach (var item in cache.SearchPairs)
                 {
-                    _searcher.Put(item.Key, item.Value);
+                    PutSearchers(item.Key, item.Value);
                 }
                 
                 Trace.WriteLine($"黑话辞典穷举耗时（从缓存载入） '{sw.Elapsed.TotalSeconds:F3}s'");
                 return;
             }
 
+            void PutSearchers(string word, Sale item)
+            {
+                _searcher.Put(word, item);
+                var index = _tree.HighestIndex + 1;
+                _tree.Put(word, index);
+                TreeSalesDic[index] = item;
+            }
             cache.SearchPairs = new List<KeyValuePair<string, Sale>>();
             cache.CacheToken = cacheToken;
 
@@ -184,12 +199,12 @@ namespace WFBot.Features.Common
                     }
 
 
-                    foreach (var item in list)
+                    foreach (var word in list)
                     {
                         lock (locker)
                         {
-                            _searcher.Put(item, sale);
-                            cache.SearchPairs.Add(new KeyValuePair<string, Sale>(item, sale));
+                            PutSearchers(word, sale);
+                            cache.SearchPairs.Add(new KeyValuePair<string, Sale>(word, sale));
                         }
                     }
                     list.Clear();
@@ -210,6 +225,7 @@ namespace WFBot.Features.Common
             sw.Stop();
             Trace.WriteLine($"黑话辞典穷举耗时 '{sw.Elapsed.TotalSeconds:F1}s'");
         }
+
     }
     public class WildcardAndSlang
     {
