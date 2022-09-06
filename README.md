@@ -31,7 +31,7 @@
 
 ## 🚧 如何部署
 
-[**🐳Docker 部署**](docs/docker.md)  
+[**🐳Docker 部署(支持自动更新)**](docs/docker.md)  
 
 [**🖥️普通部署指南**](docs/install.md)   
 [**🐧来自社区的 Linux 部署指南**](https://github.com/Wapriaily/WFBot/blob/wapriaily/docs/Liunx-install.md)
@@ -127,6 +127,7 @@
 | [WudiLib](https://github.com/int-and-his-friends/Sisters.WudiLib) | MIT | OntBot C# 连接 |
 | [GitVersion](https://github.com/GitTools/GitVersion) | MIT | 提供版本号支持 |
 | [Magick.NET](https://github.com/dlemstra/Magick.NET) | Apache-2.0 | 临时图片渲染 |
+| [Mirai.Net](https://github.com/SinoAHpx/Mirai.Net) | AGPL-3.0 | 新版 Mirai C# 连接 |
 ---
 
 Warframe 是 Digital Extremes Ltd. 的商标.

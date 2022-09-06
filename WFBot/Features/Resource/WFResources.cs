@@ -37,16 +37,16 @@ namespace WFBot.Features.Resource
             }
             WFChineseApi = new WFChineseAPI();
             ThreadPool.SetMinThreads(64, 64);
-
+                
             await Task.WhenAll(
                 Task.Run(SetWFCDResources),
                 Task.Run(SetWFContentApi),
-                Task.Run(() => { WFAApi = new WFAApi(); }),
+                // Task.Run(() => { WFAApi = new WFAApi(); }),
                 Task.Run(async () => WMAuction = await GetWMAResources()),
                 Task.Run(async () => WFTranslateData = await GetTranslateApi()),
                 Task.Run(async () => WFBotTranslateData = await GetWFBotTranslateApi()),
-                Task.Run(async () => WildcardAndSlang = await GetWildcardAndSlang()),
-                Task.Run(async () => WildCardSearcher = await WildCardSearcher.Create())
+                Task.Run(async () => RWildcardAndSlang = await GetWildcardAndSlang()),
+                Task.Run(() => WildCardSearcher = WildCardSearcher.Create())
             );
             WFTranslator = new WFTranslator();
             Weaponinfos = GetWeaponInfos();
@@ -102,7 +102,7 @@ namespace WFBot.Features.Resource
             }
         }
 
-        public static WFAApi WFAApi { get; private set; }
+        // public static WFAApi WFAApi { get; private set; }
 
         public static WFCD_All[] WFCDAll => RWFCDAll.Value;
         public static WMAuction WMAuction { get; private set; }
@@ -111,7 +111,8 @@ namespace WFBot.Features.Resource
         public static WFContentApi WFContent { get; private set; }
 
         public static WeaponInfo[] Weaponinfos { get; private set; }
-        public static WildcardAndSlang WildcardAndSlang { get; private set; }
+        public static WildcardAndSlang WildcardAndSlang => RWildcardAndSlang?.Value;
+        public static WFResource<WildcardAndSlang> RWildcardAndSlang { get; private set; }
         public static WildCardSearcher WildCardSearcher { get; private set; }
         private static WeaponInfo[] GetWeaponInfos()
         {
@@ -348,7 +349,7 @@ namespace WFBot.Features.Resource
 
             return api;
         }
-        private static async Task<WildcardAndSlang> GetWildcardAndSlang()
+        private static async Task<WFResource<WildcardAndSlang>> GetWildcardAndSlang()
         {
             var resource =
                 WFResource<WildcardAndSlang>.Create(
@@ -366,7 +367,7 @@ namespace WFBot.Features.Resource
             }
 
             await resource.WaitForInited();
-            return resource.Value;
+            return resource;
         }
         private static async Task<bool> Updater(WFResource<WildcardAndSlang> resource)
         {

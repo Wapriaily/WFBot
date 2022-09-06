@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -23,7 +24,8 @@ namespace WFBot.Features.Common
     public class WildCardSearcherCache
     {
         public string CacheToken { get; set; } = "";
-        public List<KeyValuePair<string, Sale>> SearchPairs { get; set; } = new List<KeyValuePair<string, Sale>>();
+        //public List<KeyValuePair<string, Sale>> SearchPairs { get; set; } = new List<KeyValuePair<string, Sale>>();
+        public List<KeyValuePair<string, int>> SearchPairsV2 { get; set; } = new List<KeyValuePair<string, int>>();
     }
 
     public class WildCardSearcher
@@ -35,7 +37,7 @@ namespace WFBot.Features.Common
         private Dictionary<int, Sale> TreeSalesDic = new Dictionary<int, Sale>();
 
 
-        public static async Task<WildCardSearcher> Create()
+        public static WildCardSearcher Create()
         {
             var obj = new WildCardSearcher();
             SpinWait.SpinUntil(() => WFResources.WildcardAndSlang != null && WFResources.WFBotTranslateData != null);
@@ -48,22 +50,27 @@ namespace WFBot.Features.Common
             return obj;
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public List<Sale> SuffixSearch(string text)
         {
             return _tree.Search(text.Format()).Select(t => TreeSalesDic[t]).Distinct().ToList();
         }
+
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public List<Sale> PininSearch(string text)
         {
             return _searcher.Search(text.Format()).Distinct().ToList();
         }
+
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public void UpdateSearcher()
         {
             var sw = new Stopwatch();
-            Console.WriteLine("开始黑话辞典刷新");
+            Console.WriteLine("开始黑话辞典刷新...");
             sw.Start();
             _searcher = new TreeSearcher<Sale>(SearcherLogic.Contain, PinIn.CreateDefault());
             _tree = new GeneralizedSuffixTree();
-            
+
             var cacheToken = JsonSerializer.Serialize(sales, new JsonSerializerOptions() { WriteIndented = false }).SHA2().ToHexString() +
                              JsonSerializer.Serialize(was, new JsonSerializerOptions() { WriteIndented = false }).SHA2().ToHexString();
 
@@ -79,11 +86,13 @@ namespace WFBot.Features.Common
                 cache = new WildCardSearcherCache();
             }
 
-            if (cache.CacheToken == cacheToken)
+            var ids = sales.ToDictionary(s => s.id);
+
+            if (cache.CacheToken == cacheToken && cache.SearchPairsV2.Count != 0)
             {
-                foreach (var item in cache.SearchPairs)
+                foreach (var item in cache.SearchPairsV2)
                 {
-                    PutSearchers(item.Key, item.Value);
+                    PutSearchers(item.Key, ids[item.Value]);
                 }
                 
                 Trace.WriteLine($"黑话辞典穷举耗时（从缓存载入） '{sw.Elapsed.TotalSeconds:F3}s'");
@@ -97,7 +106,7 @@ namespace WFBot.Features.Common
                 _tree.Put(word, index);
                 TreeSalesDic[index] = item;
             }
-            cache.SearchPairs = new List<KeyValuePair<string, Sale>>();
+            cache.SearchPairsV2 = new List<KeyValuePair<string, int>>();
             cache.CacheToken = cacheToken;
 
             var conbinationslangs = Enumerable.Range(0, was.CombinationSlang.Count)
@@ -204,7 +213,7 @@ namespace WFBot.Features.Common
                         lock (locker)
                         {
                             PutSearchers(word, sale);
-                            cache.SearchPairs.Add(new KeyValuePair<string, Sale>(word, sale));
+                            cache.SearchPairsV2.Add(new KeyValuePair<string, int>(word, sale.id));
                         }
                     }
                     list.Clear();
@@ -220,7 +229,7 @@ namespace WFBot.Features.Common
             }
             catch (Exception e)
             {
-                Trace.WriteLine($"写入黑化辞典缓存失败：{e}");
+                Trace.WriteLine($"写入黑话辞典缓存失败：{e}");
             }
             sw.Stop();
             Trace.WriteLine($"黑话辞典穷举耗时 '{sw.Elapsed.TotalSeconds:F1}s'");
@@ -229,22 +238,22 @@ namespace WFBot.Features.Common
     }
     public class WildcardAndSlang
     {
-        public List<KeyValuePair<string, List<string>>> Slang = new List<KeyValuePair<string, List<string>>>();
-        public List<SlangWithParams> CombinationSlang = new List<SlangWithParams>();
-        public List<string> Suffixes = new List<string>();
+        public List<KeyValuePair<string, List<string>>> Slang { get; set; } = new List<KeyValuePair<string, List<string>>>();
+        public List<SlangWithParams> CombinationSlang { get; set; } = new List<SlangWithParams>();
+        public List<string> Suffixes { get; set; } = new List<string>();
     }
     public class SlangWithParams
     {
-        public KeyValuePair<string, string> Pair = new KeyValuePair<string, string>();
-        public bool Reverse = false;
-        public int Times = Int32.MaxValue;
-        public MatchCondition Condition = new MatchCondition();
+        public KeyValuePair<string, string> Pair { get; set; } = new KeyValuePair<string, string>();
+        public bool Reverse { get; set; } = false;
+        public int Times { get; set; } = Int32.MaxValue;
+        public MatchCondition Condition { get; set; } = new MatchCondition();
     }
 
     public class MatchCondition
     {
-        public List<string> Target;
-        public Case Case = Case.None;
+        public List<string> Target { get; set; }
+        public Case Case { get; set; } = Case.None;
     }
 
     public enum Case

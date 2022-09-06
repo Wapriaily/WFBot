@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
@@ -15,7 +16,8 @@ namespace WFBot.Orichalt
         QQChannel = 2,
         MiraiHTTP = 3,
         Test = 4,
-        Unknown = 5
+        Unknown = 5,
+        MiraiHTTPV1 = 6,
     }
 
     public enum MessageScope
@@ -55,9 +57,10 @@ namespace WFBot.Orichalt
     }
     public class OrichaltContextManager
     {
-        public Dictionary<string, OneBotContext> OneBotContexts = new Dictionary<string, OneBotContext>();
+        public ConcurrentDictionary<string, OneBotContext> OneBotContexts = new();
 
-        public Dictionary<string, MiraiHTTPContext> MiraiHTTPContexts = new Dictionary<string, MiraiHTTPContext>();
+        public ConcurrentDictionary<string, MiraiHTTPContext> MiraiHTTPContexts = new();
+        public ConcurrentDictionary<string, MiraiHTTPV1Context> MiraiHTTPV1Contexts = new();
         // 往下扩展各个平台
 
         public PlatformContextBase GetPlatformContext(OrichaltContext context)
@@ -77,6 +80,10 @@ namespace WFBot.Orichalt
         public MiraiHTTPContext GetMiraiHTTPContext(OrichaltContext o)
         {
             return MiraiHTTPContexts[o.UUID];
+        }
+        public MiraiHTTPV1Context GetMiraiHTTPV1Context(OrichaltContext o)
+        {
+            return MiraiHTTPV1Contexts[o.UUID];
         }
         public OrichaltContext PutPlatformContext(OneBotContext context)
         {
@@ -116,6 +123,26 @@ namespace WFBot.Orichalt
             MiraiHTTPContexts[o.UUID] = context;
             return o;
         }
+
+        public OrichaltContext PutPlatformContext(MiraiHTTPV1Context context)
+        {
+            MessageScope scope;
+            switch (context.Type)
+            {
+                case MessageType.Group:
+                    scope = MessageScope.Public;
+                    break;
+                case MessageType.Private:
+                    scope = MessageScope.Private;
+                    break;
+                default:
+                    scope = MessageScope.Public;
+                    break;
+            }
+            var o = new OrichaltContext(context.RawMessage, MessagePlatform.MiraiHTTPV1, scope);
+            MiraiHTTPV1Contexts[o.UUID] = context;
+            return o;
+        }
         public OrichaltContext PutPlatformContext(KaiheilaContext context)
         {
             throw new NotImplementedException();
@@ -134,10 +161,13 @@ namespace WFBot.Orichalt
             switch (context.Platform)
             {
                 case MessagePlatform.OneBot:
-                    OneBotContexts.Remove(context.UUID);
+                    OneBotContexts.Remove(context.UUID, out _);
                     break;
                 case MessagePlatform.MiraiHTTP:
-                    MiraiHTTPContexts.Remove(context.UUID);
+                    MiraiHTTPContexts.Remove(context.UUID, out _);
+                    break;
+                case MessagePlatform.MiraiHTTPV1:
+                    MiraiHTTPV1Contexts.Remove(context.UUID, out _);
                     break;
             }
             // 往下扩展各个平台

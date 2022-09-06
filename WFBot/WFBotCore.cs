@@ -5,6 +5,7 @@ using System.IO;
 using System.IO.Pipes;
 using System.Linq;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
@@ -23,6 +24,7 @@ using WFBot.Features.Utils;
 using WFBot.Orichalt;
 using WFBot.TextCommandCore;
 using WFBot.Utils;
+using WFBot.WebUI;
 using WFBot.Windows;
 
 #pragma warning disable 164
@@ -40,7 +42,7 @@ namespace WFBot
         https://github.com/TRKS-Team/WFBot
             var skipPressKey = false;
             var setCurrentFolder = false;
-            
+
             foreach (var s in args)
             {
                 switch (s)
@@ -63,7 +65,9 @@ namespace WFBot
                         break;
                 }
             }
-
+#if DEBUG
+            setCurrentFolder = true;
+#endif
             if (setCurrentFolder)
             {
                 Directory.SetCurrentDirectory(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location));
@@ -86,7 +90,7 @@ namespace WFBot
                 return;
             }
 
-            await wfbot.Run();
+            wfbot.Run();
         }
     }
     public sealed class WFBotCore
@@ -108,6 +112,8 @@ namespace WFBot
         public static bool IsOfficial { get; }
         public static bool IsShuttingDown { get; private set; }
         public static bool IsTest { get; private set; }
+        public static WFBotWebUIServer WebUIServer { get; private set; }
+        public static DateTime StartTime { get; } = DateTime.Now;
 
         static WFBotCore()
         {
@@ -140,14 +146,14 @@ namespace WFBot
 
         }
 
-        public async Task Run()
+        public void Run()
         {
             while (true)
             {
                 var text = Console.ReadLine();
                 if (text == null)
                 {
-                    Console.WriteLine("WORKAROUND: 检测到空控制台输入，将不再读取控制台输入。这可能是因为 WFBot 运行在 Docker 下。如果你在正常情况下看到这个错误，请汇报它。");
+                    Trace.WriteLine("WORKAROUND: 检测到空控制台输入，将不再读取控制台输入。这可能是因为 WFBot 运行在 Docker 下。如果你在正常情况下看到这个错误，请汇报它。");
                     Thread.CurrentThread.Join();
                 }
 
@@ -156,6 +162,9 @@ namespace WFBot
                     case "ui":
                         OpenWFBotSettingsWindow();
                         break;
+                    case "webui":
+                        OpenWebUI();
+                        break;
                     case "exit":
                     case "stop":
                         Shutdown();
@@ -163,10 +172,23 @@ namespace WFBot
                     default:
                         if (!(new CustomCommandMatcherHandler(text.TrimStart('/'))).ProcessCommandInput().Result.matched)
                         {
-                            // ConnectorManager.Connector.OnCommandLineInput(text);
+                            // todo ConnectorManager.Connector.OnCommandLineInput(text);
                         }
                         break;
                 }
+            }
+        }
+
+        void OpenWebUI()
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                Process.Start(new ProcessStartInfo($"http://localhost:{WFBotWebUIServer.GetServerPort()}")
+                    { UseShellExecute = true });
+            }
+            else
+            {
+                Console.WriteLine("你使用的不是 Windows, 请手动打开 " + $"http://localhost:{WFBotWebUIServer.GetServerPort()}");
             }
         }
 
@@ -284,9 +306,23 @@ namespace WFBot
             Trace.WriteLine("加载配置文件...");
             Config.Update();
             Config.Save();
+
+            // 初始化 WebUI
+            WebUIServer = new WFBotWebUIServer();
+            WebUIServer.Run();
+
             if (Config.Instance.Miguel_Platform == MessagePlatform.Unknown && !IsTest)
             {
-                Console.WriteLine("看起来你是第一次使用WFBot, 请在WFConfig.json里修改\"Miguel_Platform\"项, 聊天平台对应关系: 0.OneBot 1.Kaiheila 2.QQ频道 3.MiraiHTTPv2");
+                Trace.WriteLine("看起来你是第一次使用WFBot, 请在WFConfig.json里修改\"Miguel_Platform\"项, 聊天平台对应关系: 0.OneBot 1.Kaiheila 2.QQ频道 3.MiraiHTTPv2");
+                Trace.WriteLine("你也可以使用 WebUI 来进行设置，详情请查看文档.");
+                Trace.WriteLine("设置完后请重启 WFBot.");
+                if (OperatingSystem.IsWindows())
+                {
+                    Process.Start(new ProcessStartInfo($"http://localhost:{WFBotWebUIServer.GetServerPort()}")
+                        {UseShellExecute = true});
+                }
+                Thread.CurrentThread.Join();
+
                 Shutdown();
             }
             /*while (Config.Instance.Miguel_Platform == MessagePlatform.Unknown && !IsTest)
@@ -302,19 +338,22 @@ namespace WFBot
             switch (Config.Instance.Miguel_Platform)
             {
                 case MessagePlatform.OneBot:
-                    Console.WriteLine("服务协议: Onebot");
+                    Trace.WriteLine("服务协议: Onebot");
                     break;
                 case MessagePlatform.MiraiHTTP:
-                    Console.WriteLine("服务协议: MiraiHTTPv2");
+                    Trace.WriteLine("服务协议: MiraiHTTPv2");
+                    break;
+                case MessagePlatform.MiraiHTTPV1:
+                    Trace.WriteLine("服务协议: MiraiHTTPv1");
                     break;
                 case MessagePlatform.Kaiheila:
-                    Console.WriteLine("服务协议: 开黑啦");
+                    Trace.WriteLine("服务协议: 开黑啦");
                     break;
                 case MessagePlatform.QQChannel:
-                    Console.WriteLine("服务协议: QQ频道");
+                    Trace.WriteLine("服务协议: QQ频道");
                     break;
                 case MessagePlatform.Test:
-                    Console.WriteLine("服务协议: 测试模式");
+                    Trace.WriteLine("服务协议: 测试模式");
                     break;
             }
             Trace.WriteLine("加载米格尔网络...");
@@ -346,7 +385,10 @@ namespace WFBot
             }
 
             _requestedCtrlCShutdown = false;
-            Messenger.SendDebugInfo($"<<<< WFBot 加载完成. 用时 {sw.Elapsed.TotalSeconds:F1}s. >>>>");
+            Trace.WriteLine("");
+            Messenger.SendDebugInfo($"<<<<   WFBot 加载完成. 用时 {sw.Elapsed.TotalSeconds:F1}s.   >>>>");
+            Trace.WriteLine("WebUI 在 "+ $"http://localhost:{WFBotWebUIServer.GetServerPort()}" +" 启用.");
+            Trace.WriteLine("");
         }
 
         void CheckTime()
@@ -355,7 +397,7 @@ namespace WFBot
             {
                 if (TimeZoneInfo.Local.GetUtcOffset(DateTime.UtcNow).Hours != 8)
                 {
-                    var msg = "**************警告: 你的系统时区不为 UTC+8, 会造成任务通知不精确.";
+                    var msg = "**************警告: 你的系统时区不为 UTC+8, 会造成任务通知不精确.**************";
                     Messenger.SendDebugInfo(msg);
                 }
                 var sntpClient = new SNTPClient("ntp.aliyun.com");
@@ -363,15 +405,15 @@ namespace WFBot
                 var timeSpan = TimeSpan.FromMilliseconds(sntpClient.LocalClockOffset);
                 if (timeSpan.TotalMinutes > 1)
                 {
-                    var msg = $"*************警告: 你的系统时间与世界时间相差了1分钟以上, 具体来说是{timeSpan.TotalMinutes}分钟, 请调整系统时间, 否则可能会造成通知不精确.";
+                    var msg = $"*************警告: 你的系统时间与世界时间相差了1分钟以上, 具体来说是{timeSpan.TotalMinutes}分钟, 请调整系统时间, 否则可能会造成通知不精确.**************";
                     Messenger.SendDebugInfo(msg);
-                    Console.WriteLine(msg);
+                    Trace.WriteLine(msg);
                 }
             }
             catch (Exception e)
             {
-                Console.WriteLine("时间检查出错:");
-                Console.WriteLine(e);
+                Trace.WriteLine("时间检查出错:");
+                Trace.WriteLine(e);
             }
 
         }
@@ -389,6 +431,7 @@ namespace WFBot
                 Trace.Listeners.Add(fileListener);
             }
             Trace.Listeners.Add(new ConsoleTraceListener());
+            Trace.Listeners.Add(new WebLogTraceListener());
             Trace.AutoFlush = true;
         }
 

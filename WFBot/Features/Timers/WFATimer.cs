@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using Humanizer;
 using WFBot.Features.Resource;
@@ -14,14 +15,14 @@ namespace WFBot.Features.Timers
         }
         protected override void Tick()
         {
-            try
+            /*try
             {
                 WFResources.WFAApi.UpdateClient();
             }
             catch (Exception e)
             {
-                Console.WriteLine(e);
-            }
+                Trace.WriteLine(e);
+            }*/
         }
     }
 }
