@@ -7,12 +7,12 @@ using System.Net.Sockets;
 using System.Reactive.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Chaldene.Data.Messages;
+using Chaldene.Data.Messages.Receivers;
+using Chaldene.Sessions;
 using Flurl.Http;
 using GammaLibrary;
 using GammaLibrary.Extensions;
-using Mirai.Net.Data.Messages;
-using Mirai.Net.Data.Messages.Receivers;
-using Mirai.Net.Sessions;
 using WFBot.Features.Utils;
 
 namespace WFBot.Orichalt.OrichaltConnectors
@@ -46,6 +46,7 @@ namespace WFBot.Orichalt.OrichaltConnectors
 
         public bool AutoRevoke = false;
         public int RevokeTimeInSeconds = 60;
+        public bool UseHttps = false;
     }
 
     public class MiraiHTTPCore
@@ -75,9 +76,10 @@ namespace WFBot.Orichalt.OrichaltConnectors
             {
                 Address = $"{config.Host}:{config.Port}",
                 QQ = config.BotQQ.ToString(),
-                VerifyKey = config.AuthKey
+                VerifyKey = config.AuthKey,
+                UseHttps = config.UseHttps
             };
-
+            var i = true;
             while (true)
             {
                 try
@@ -86,21 +88,22 @@ namespace WFBot.Orichalt.OrichaltConnectors
                     await Bot.LaunchAsync();
                     break;
                 }
-                catch (FlurlHttpException)
+                catch (FlurlHttpException e)
                 {
                     Trace.WriteLine("MiraiHTTPv2连接失败, 1秒后重试···");
+                    if (i)
+                    {
+                        Trace.WriteLine(e.ToString());
+                    }
+                    i = false;
                     await Task.Delay(1000);
                 }
             }
             Trace.WriteLine("MiraiHTTPv2已连接.");
-                
-            Bot.MessageReceived
-                .OfType<GroupMessageReceiver>()
-                .Subscribe(GroupMessageReceived);
-            Bot.MessageReceived
-                .OfType<FriendMessageReceiver>()
-                .Subscribe(FriendMessageReceived);
-
+            
+            
+            Bot.GroupMessageReceived += (s, e) => GroupMessageReceived(e);
+            Bot.FriendMessageReceived += (s, e) => FriendMessageReceived(e);
         }
 
         private MiraiConfig config => MiraiConfig.Instance;

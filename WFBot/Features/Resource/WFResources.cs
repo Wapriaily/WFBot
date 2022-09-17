@@ -38,7 +38,7 @@ namespace WFBot.Features.Resource
             WFChineseApi = new WFChineseAPI();
             ThreadPool.SetMinThreads(64, 64);
                 
-            await Task.WhenAll(
+            var task = new List<Task> {
                 Task.Run(SetWFCDResources),
                 Task.Run(SetWFContentApi),
                 // Task.Run(() => { WFAApi = new WFAApi(); }),
@@ -47,7 +47,11 @@ namespace WFBot.Features.Resource
                 Task.Run(async () => WFBotTranslateData = await GetWFBotTranslateApi()),
                 Task.Run(async () => RWildcardAndSlang = await GetWildcardAndSlang()),
                 Task.Run(() => WildCardSearcher = WildCardSearcher.Create())
-            );
+            };
+            foreach (var task1 in task)
+            {
+                await task1;
+            }
             WFTranslator = new WFTranslator();
             Weaponinfos = GetWeaponInfos();
             
@@ -390,7 +394,16 @@ namespace WFBot.Features.Resource
                     return false;
                 }
                 if (sha == info.SHA) return false;
-                Messenger.SendDebugInfo($"发现{info.Category}有更新,正在更新···");
+
+                var s = $"发现{info.Category}有更新,正在更新···";
+                if (Config.Instance.SendResourceUpdateNotification)
+                {
+                    Messenger.SendDebugInfo(s);
+                }
+                else
+                {
+                    Trace.WriteLine(s);
+                }
                 await Task.WhenAll(WFResourcesManager.WFResourceDic[info.Category].Select(r => r.Reload(false)));
                 WildCardSearcher.UpdateSearcher(); /*不用刷新翻译器*/
 
@@ -398,7 +411,7 @@ namespace WFBot.Features.Resource
                 {
                     i.LastUpdated = DateTime.Now;
                     i.SHA = sha;
-                });
+                }).ToArray();
                 GitHubInfos.Save();
 
                 return true;

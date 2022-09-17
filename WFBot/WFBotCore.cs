@@ -26,6 +26,7 @@ using WFBot.TextCommandCore;
 using WFBot.Utils;
 using WFBot.WebUI;
 using WFBot.Windows;
+using static System.Net.Mime.MediaTypeNames;
 
 #pragma warning disable 164
 
@@ -80,18 +81,29 @@ namespace WFBot
             }
             catch (Exception e)
             {
-                Console.WriteLine("WFBot 在初始化中遇到了问题.");
+                Trace.WriteLine("WFBot 在初始化中遇到了问题.");
+                Trace.WriteLine($"你现在可以在 WebUI http://localhost:{WFBotWebUIServer.GetServerPort()} 中修改设置.");
                 Trace.WriteLine(e);
+                Panic = true;
+                var sw = Stopwatch.StartNew();
                 if (!skipPressKey)
                 {
                     Console.WriteLine("按任意键继续.");
                     Console.ReadKey();
+                }
+
+                if (sw.ElapsedMilliseconds < 200)
+                {
+                    Console.WriteLine("触发 Console.ReadKey 的时间较短, 可能是在 docker 下运行, 为了保证 WebUI 的正常运行, 将不结束程序.");
+                    Thread.CurrentThread.Join();
                 }
                 return;
             }
 
             wfbot.Run();
         }
+
+        public static bool Panic { get; private set; } = false;
     }
     public sealed class WFBotCore
     {
@@ -157,25 +169,31 @@ namespace WFBot
                     Thread.CurrentThread.Join();
                 }
 
-                switch (text.ToLower())
-                {
-                    case "ui":
-                        OpenWFBotSettingsWindow();
-                        break;
-                    case "webui":
-                        OpenWebUI();
-                        break;
-                    case "exit":
-                    case "stop":
-                        Shutdown();
-                        return;
-                    default:
-                        if (!(new CustomCommandMatcherHandler(text.TrimStart('/'))).ProcessCommandInput().Result.matched)
-                        {
-                            // todo ConnectorManager.Connector.OnCommandLineInput(text);
-                        }
-                        break;
-                }
+                OnConsoleCommand(text);
+
+            }
+        }
+
+        public void OnConsoleCommand(string s)
+        {
+            switch (s.ToLower())
+            {
+                case "ui":
+                    OpenWFBotSettingsWindow();
+                    break;
+                case "webui":
+                    OpenWebUI();
+                    break;
+                case "exit":
+                case "stop":
+                    Shutdown();
+                    return;
+                default:
+                    if (!(new CustomCommandMatcherHandler(s.TrimStart('/'))).ProcessCommandInput().Result.matched)
+                    {
+                        // todo ConnectorManager.Connector.OnCommandLineInput(text);
+                    }
+                    break;
             }
         }
 
@@ -242,7 +260,14 @@ namespace WFBot
         {
             if (!Inited)
             {
-                Trace.WriteLine($"Message ignored due to uninitialized: {o.GetInfo()}");
+                if (Program.Panic)
+                {
+                    Trace.WriteLine($"接收到消息{o.GetInfo()}, 但是WFBot在初始化中遇到了问题, 请向上翻.");   
+                }
+                else
+                {
+                    Trace.WriteLine($"由于 WFBot 未初始化完, 接收到的消息无法处理: {o.GetInfo()}");
+                }
                 // 为啥这句要写英文?
                 return;
             }
@@ -322,8 +347,6 @@ namespace WFBot
                         {UseShellExecute = true});
                 }
                 Thread.CurrentThread.Join();
-
-                Shutdown();
             }
             /*while (Config.Instance.Miguel_Platform == MessagePlatform.Unknown && !IsTest)
             {
@@ -402,8 +425,8 @@ namespace WFBot
                 }
                 var sntpClient = new SNTPClient("ntp.aliyun.com");
                 sntpClient.Connect(false);
-                var timeSpan = TimeSpan.FromMilliseconds(sntpClient.LocalClockOffset);
-                if (timeSpan.TotalMinutes > 1)
+                var timeSpan = TimeSpan.FromMilliseconds(sntpClient.LocalClockOffset) + TimeSpan.FromHours(8);
+                if (timeSpan.TotalMinutes is > 1 or < 1)
                 {
                     var msg = $"*************警告: 你的系统时间与世界时间相差了1分钟以上, 具体来说是{timeSpan.TotalMinutes}分钟, 请调整系统时间, 否则可能会造成通知不精确.**************";
                     Messenger.SendDebugInfo(msg);
@@ -430,6 +453,7 @@ namespace WFBot
                 { TraceOutputOptions = TraceOptions.Timestamp };
                 Trace.Listeners.Add(fileListener);
             }
+            
             Trace.Listeners.Add(new ConsoleTraceListener());
             Trace.Listeners.Add(new WebLogTraceListener());
             Trace.AutoFlush = true;
