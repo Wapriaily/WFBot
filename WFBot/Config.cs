@@ -13,8 +13,11 @@ namespace WFBot
     [Configuration("WFConfig")]
     public class Config : Configuration<Config>
     {
-        public List<string> WFGroupList = new List<string>();
+        public string ClientGUID = Guid.NewGuid().ToString("D");
+        public string WebUIPassword = "";
 
+        public List<string> WFGroupList = new List<string>();
+        
         public List<string> InvationRewardList = new List<string>();
 
         public string Code = "*******";
@@ -67,7 +70,8 @@ namespace WFBot
         public bool UseTelemetry = true;
         public bool SendResourceUpdateNotification = true;
         public MessagePlatform Miguel_Platform = MessagePlatform.Unknown;
-
+        public bool EnableCustomCommandContent = false;
+        
         protected override void AfterUpdate()
         {
             // 这里我写的好丑
