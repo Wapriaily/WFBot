@@ -9,14 +9,17 @@ using System.Net.NetworkInformation;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
 using GammaLibrary.Extensions;
 using InternetTime;
 using WFBot.Events;
+using WFBot.Features.Common;
 using WFBot.Features.CustomCommandContent;
 using WFBot.Features.Events;
+using WFBot.Features.ImageRendering;
 using WFBot.Features.Other;
 using WFBot.Features.Resource;
 using WFBot.Features.Telemetry;
@@ -66,18 +69,37 @@ namespace WFBot
                         Directory.CreateDirectory("WFBotConfigs");
                         UseConfigFolder = true;
                         break;
+                    case "--get-version":
+                        Console.WriteLine(WFBotCore.Version);
+                        Environment.Exit(0);
+                        break;
                 }
+            }
+            Directory.CreateDirectory("WFCaches");
+
+            if (!File.Exists("WFConfig.json"))
+            {
+                Directory.CreateDirectory("WFBotConfigs");
+                UseConfigFolder = true;
             }
 #if DEBUG
             setCurrentFolder = true;
 #endif
             if (setCurrentFolder)
             {
-                Directory.SetCurrentDirectory(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location));
+                Directory.SetCurrentDirectory(Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName));
             }
 
 
-            //return;
+            if (!IsInDocker && !args.Any(x => x == "--wrapper") && !Debugger.IsAttached
+#if DEBUG
+                && false
+#endif
+               )
+            {
+                Migrate();
+                return;
+            }
 
             var wfbot = new WFBotCore();
             try
@@ -104,10 +126,82 @@ namespace WFBot
                 }
                 return;
             }
-
+            
             wfbot.Run();
         }
 
+        static bool IsInDocker => Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true";
+
+        static void Migrate()
+        {
+            var fileName = OperatingSystem.IsWindows() ? "WFBotWrapper.exe" : "WFBotWrapper";
+            if (!File.Exists(fileName))
+            {
+                DownloadWrapper();
+            }
+            Console.WriteLine($"请打开 ./{fileName}");
+        }
+
+        static void DownloadWrapper()
+        {
+            var fileName = OperatingSystem.IsWindows() ? "WFBotWrapper.exe" : "WFBotWrapper";
+            var fs = File.Open(fileName, FileMode.Create, FileAccess.Write);
+            string url = "https://wfbot.cyan.cafe/api/WFBotWrapper/DownloadWrapper";
+            if (OperatingSystem.IsWindows())
+            {
+                url += "Windows";
+            }
+            else if (OperatingSystem.IsLinux())
+            {
+                if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                {
+                    url += "LinuxArm64";
+                }
+                else if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
+                {
+                    url += "LinuxX64";
+                }
+                else
+                {
+                    throw new InvalidOperationException("不支持的系统版本");
+                }
+            }
+            else
+            {
+                throw new InvalidOperationException("不支持的系统版本");
+            }
+            new HttpClient().GetStreamAsync(url).Result.CopyTo(fs);
+            fs.Close();
+            EnsureExecutePermission(fileName);
+        }
+
+        static void EnsureExecutePermission(string path)
+        {
+            if (OperatingSystem.IsLinux())
+            {
+                Exec($"chmod 777 {path}");
+            }
+        }
+
+        static void Exec(string cmd)
+        {
+            var escapedArgs = cmd.Replace("\"", "\\\"");
+
+            using var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                    FileName = "/bin/sh",
+                    Arguments = $"-c \"{escapedArgs}\""
+                }
+            };
+
+            process.Start();
+            process.WaitForExit();
+        }
         public static bool Panic { get; private set; } = false;
     }
     public sealed class WFBotCore
@@ -336,14 +430,14 @@ namespace WFBot
             Config.Update();
             Config.Save();
 
-            TelemetryClient.Start();
+            _ = TelemetryClient.Start();
             // 初始化 WebUI
             WebUIServer = new WFBotWebUIServer();
             WebUIServer.Run();
 
             if (Config.Instance.Miguel_Platform == MessagePlatform.Unknown && !IsTest)
             {
-                Trace.WriteLine("看起来你是第一次使用WFBot, 请在WFConfig.json里修改\"Miguel_Platform\"项, 聊天平台对应关系: 0.OneBot 1.Kaiheila 2.QQ频道 3.MiraiHTTPv2");
+                Trace.WriteLine("看起来你是第一次使用WFBot, 请在WFConfig.json里修改\"Miguel_Platform\"项, 聊天平台对应关系: 0.OneBot 1.Kook 2.QQ频道 3.MiraiHTTPv2");
                 Trace.WriteLine("你也可以使用 WebUI 来进行设置，详情请查看文档.");
                 Trace.WriteLine("设置完后请重启 WFBot.");
                 if (OperatingSystem.IsWindows())
@@ -355,7 +449,7 @@ namespace WFBot
             }
             /*while (Config.Instance.Miguel_Platform == MessagePlatform.Unknown && !IsTest)
             {
-                Console.WriteLine("看起来你是第一次使用WFBot, 请通过数字序号指定聊天平台, 0.OneBot(Mirai) 1.Kaiheila 2.QQ频道 3.MiraiHTTPv2");
+                Console.WriteLine("看起来你是第一次使用WFBot, 请通过数字序号指定聊天平台, 0.OneBot(Mirai) 1.Kook 2.QQ频道 3.MiraiHTTPv2");
                 /*var platformstr = Console.ReadLine();
                 if (platformstr.IsNumber() && platformstr.ToInt() <= 3 && 0 <= platformstr.ToInt())
                 {
@@ -374,7 +468,7 @@ namespace WFBot
                 case MessagePlatform.MiraiHTTPV1:
                     Trace.WriteLine("服务协议: MiraiHTTPv1");
                     break;
-                case MessagePlatform.Kaiheila:
+                case MessagePlatform.Kook:
                     Trace.WriteLine("服务协议: 开黑啦");
                     break;
                 case MessagePlatform.QQChannel:
@@ -410,6 +504,10 @@ namespace WFBot
             // 检查时间...
             _ = Task.Run(() => CheckTime());
 
+            // 初始化图片渲染 PGO
+            Trace.WriteLine("初始化图片渲染PGO...");
+            ImageRenderingPGO.Init();
+
             // 初始化定时器
             Trace.WriteLine("初始化定时器...");
             InitTimer();
@@ -430,7 +528,13 @@ namespace WFBot
             try
             {
                 var hc = new HttpClient();
-                var s = await hc.GetStringAsync($"https://wfbot.cyan.cafe/api/StartUpTime?time={startTime:F4}");
+                if (!File.Exists("WFConfigs/font.ttf") || new FileInfo("WFConfigs/font.ttf").Length < 100000) // 之前服务器没传上文件
+                {
+                    Trace.WriteLine("下载图片渲染字体...");
+                    Directory.CreateDirectory("WFConfigs");
+                    await hc.DownloadAsync("https://cyan.cafe/wfbot/font.ttf", "WFConfigs/font.ttf");
+                }
+                var s = await hc.GetStringAsync($"https://wfbot.cyan.cafe/api/StartUpTime?time={startTime:F4}&clientid={TelemetryClient.ClientID}");
                 t = s;
             }
             catch (Exception)
@@ -500,6 +604,7 @@ namespace WFBot
         {
             AddTimer<NotificationTimer>();
             AddTimer<WFResourcesTimer>();
+            AddTimer<ImageRenderingPGOTimer>();
 
             void AddTimer<T>() where T : WFBotTimer
             {

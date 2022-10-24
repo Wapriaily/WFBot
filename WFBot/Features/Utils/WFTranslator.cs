@@ -258,6 +258,21 @@ namespace WFBot.Features.Utils
             //se.previous.activation = GetRealTime(se.activation);
 
         }
+
+        public void TranslateArchonHunt(ArchonHunt ah)
+        {
+            ah.expiry = GetRealTime(ah.expiry);
+            ah.activation = GetRealTime(ah.activation);
+            
+            ah.boss = dictTranslator.Translate(ah.boss).Result;
+
+            foreach (var mission in ah.missions)
+            {
+                mission.node = TranslateNode(mission.node);
+                mission.type = dictTranslator.Translate(mission.type).Result;
+            }
+
+        }
         // 打了最后一愿之后就再也没法直视Riven这个单词了
         public void TranslateRivenOrders(List<WarframeAlertingPrime.SDK.Models.User.Order> orders)
         {
@@ -288,7 +303,8 @@ namespace WFBot.Features.Utils
         {
             foreach (var challenge in nightwave.activeChallenges)
             {
-                challenge.desc = nightwaveTranslator.Translate(challenge.desc.Format().Replace(",", "")).Result;
+                var translate = nightwaveTranslator.Translate(challenge.desc.Format().Replace(",", ""));
+                challenge.desc = translate.IsTranslated ? translate.Result : challenge.desc;
                 challenge.title = nightwaveTranslator.Translate(challenge.title.Format()).Result;
                 challenge.expiry = GetRealTime(challenge.expiry);
             }
@@ -319,7 +335,10 @@ namespace WFBot.Features.Utils
         {
             TranslateReward(invasion.attackerReward);
             TranslateReward(invasion.defenderReward);
+            
             invasion.node = TranslateNode(invasion.node);
+
+            invasion.desc = dictTranslator.Translate(invasion.desc).Result;
         }
 
         private void TranslateReward(RewardInfo reward)

@@ -1,19 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
+﻿using System.Collections.Immutable;
 using System.Diagnostics.Contracts;
 using System.Globalization;
-using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using GammaLibrary.Extensions;
 using Humanizer;
 using Humanizer.Localisation;
 using WarframeAlertingPrime.SDK.Models.Enums;
 using WarframeAlertingPrime.SDK.Models.User;
 using WFBot.Features.Common;
-using WFBot.Features.Other;
 using WFBot.Features.Resource;
 using WFBot.Features.Telemetry;
 using WFBot.Utils;
@@ -52,6 +47,7 @@ namespace WFBot.Features.Utils
     /警报 | 所有警报
     /入侵 | 所有入侵
     /突击 | 所有突击
+    /猎杀 | 本周执刑官猎杀
     /活动 | 所有活动
     /虚空商人 | 奸商的状态
     /平原 | 地球&金星&火卫二平原的时间循环
@@ -501,7 +497,7 @@ namespace WFBot.Features.Utils
             if (rivens.Any())
             {
                 var riven = rivens.First();
-                sb.AppendLine($"下面是 {weapon.zhname} 紫卡的基本信息");
+                sb.AppendLine($"{weapon.zhname} 紫卡的基本信息");
                 sb.AppendLine($"类型: {WFResources.WFTranslator.TranslateWeaponType(riven.type)} 倾向: {riven.rank}星 倍率: {Math.Round(riven.modulus, 2)}");
             }
 
@@ -660,7 +656,7 @@ namespace WFBot.Features.Utils
             return sb.ToString().Trim();
         }
         [Pure]
-        public static string ToString(SyndicateMission mission, int index)
+        public static string ToString(SyndicateMission mission, int index, bool imageRendering)
         {
             var sb = new StringBuilder();
             sb.AppendLine($"集团: {mission.syndicate}");
@@ -683,25 +679,29 @@ namespace WFBot.Features.Utils
                     sb.AppendLine($"> 赏金{count} 等级: {job.enemyLevels[0]} - {job.enemyLevels[1]}");
                 }
 
-                sb.Append("- 奖励:");
+                sb.Append("- 奖励: ");
                 // 我非常确认这里以前一定是个Append, 有人多换了个行, 然后难看死了
                 // 但是谁会改呢
                 foreach (var reward in job.rewardPool)
                 {
-                    sb.Append($"[{reward}]");
+                    sb.Append($"[{reward}] ");
                 }
 
                 sb.AppendLine();
+                if (imageRendering) sb.AppendLine();
             }
 
             return sb.ToString().Trim();
         }
         [Pure]
-        public static string ToString(WFInvasion inv)
+        public static string ToString(WFInvasion inv, bool isNotification = false)
         {
             var sb = new StringBuilder();
             var completion = Math.Floor(inv.completion);
-            sb.Append("指挥官, 太阳系陷入了一片混乱, 查看你的星图\r\n");
+            if (isNotification)
+            {
+                sb.Append("指挥官, 太阳系陷入了一片混乱, 查看你的星图\r\n");
+            }
             sb.AppendLine($"地点: [{inv.node}]");
 
             sb.AppendLine($"> 进攻方: {inv.attackingFaction}");
@@ -846,25 +846,25 @@ namespace WFBot.Features.Utils
             // 以后不好看了再说
             return sb.ToString().Trim();
         }
-        [Pure]
-        public static string ToString(WMInfoEx info, bool withQR, bool isbuyer)
-        {
-            var sb = new StringBuilder();
-            sb.AppendLine($"下面是物品: {info.sale.zh} 按价格{(isbuyer ? "从大到小" : "从小到大")}的{info.orders.Items.Count}条{(isbuyer ? "买家" : "卖家")}信息");
-            sb.AppendLine();
-
-            foreach (var order in info.orders.Items)
-            {
-                sb.AppendLine($"{order.order_type} {order.platinum} 白鸡 [{order.user.ingame_name}] {order.user.status}");
-                if (withQR)
-                {
-                    sb.AppendLine(
-                        $"- 快捷回复: /w {order.user.ingame_name} Hi! I want to {(isbuyer ? "sell" : "buy")}: {info.sale.en} for {order.platinum} platinum. (warframe.market)");
-                }
-            }
-            // 这已经很难看了好吧
-            return sb.ToString().Trim();
-        }
+        // [Pure]
+        // public static string ToString(WMInfoEx info, bool withQR, bool isbuyer)
+        // {
+        //     var sb = new StringBuilder();
+        //     sb.AppendLine($"下面是物品: {info.sale.zh} 按价格{(isbuyer ? "从大到小" : "从小到大")}的{info.orders.Items.Count}条{(isbuyer ? "买家" : "卖家")}信息");
+        //     sb.AppendLine();
+        //
+        //     foreach (var order in info.orders.Items)
+        //     {
+        //         sb.AppendLine($"{order.order_type} {order.platinum} 白鸡 [{order.user.ingame_name}] {order.user.status}");
+        //         if (withQR)
+        //         {
+        //             sb.AppendLine(
+        //                 $"- 快捷回复: /w {order.user.ingame_name} Hi! I want to {(isbuyer ? "sell" : "buy")}: {info.sale.en} for {order.platinum} platinum. (warframe.market)");
+        //         }
+        //     }
+        //     // 这已经很难看了好吧
+        //     return sb.ToString().Trim();
+        // }
         [Pure]
         public static string ToString(RewardInfo reward)
         {
@@ -904,6 +904,22 @@ namespace WFBot.Features.Utils
             return string.Join(" + ", rewards);
         }
 
-        
+        public static string Format(ArchonHunt archonHunt)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("指挥官, 下面是本周的执刑官猎杀任务.");
+            sb.AppendLine($"> 首领: {archonHunt.boss}");
+            sb.AppendLine();
+            foreach (var mission in archonHunt.missions)
+            {
+                sb.AppendLine($"[{mission.node}]");
+                sb.AppendLine($"- 类型:{mission.type}");
+            }
+            sb.AppendLine();
+            var time = (DateTime.Now - archonHunt.expiry).Humanize(int.MaxValue,
+                    CultureInfo.GetCultureInfo("zh-CN"), TimeUnit.Day, TimeUnit.Second, " ");
+            sb.Append($"结束时间: {time} 后");
+            return sb.ToString().Trim();
+        }
     }
 }

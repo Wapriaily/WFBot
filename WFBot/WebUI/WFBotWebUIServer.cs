@@ -52,12 +52,18 @@ namespace WFBot.WebUI
                     typeof(Program).Assembly, "wwwroot"
                 )
             });
+            app.UseFileServer(new FileServerOptions
+            {
+                FileProvider = new ManifestEmbeddedFileProvider(
+                    typeof(Program).Assembly, "wwwroot2"
+                )
+            });
             app.UseStaticFiles();
             app.UseRouting();
 
             app.MapBlazorHub();
             app.MapFallbackToPage("/_Host");
-            app.MapGet("/auth", async (x) =>
+            app.MapGet("/auth", (x) =>
             {
                 if (x.Request.Cookies.Any(c => c.Key == "auth"))
                 {
@@ -66,8 +72,9 @@ namespace WFBot.WebUI
                 }
                 x.Response.Cookies.Append("auth" ,x.Request.Query["password"], new CookieOptions(){MaxAge = TimeSpan.FromDays(3), HttpOnly = true});
                 x.Response.Redirect("/");
+                return Task.CompletedTask;
             });
-            app.RunAsync();
+            _ = app.RunAsync();
             
         }
 
