@@ -71,7 +71,7 @@ $ ./mcl-installer-1.0.7-linux-amd64
 
 ## 第二步: 配置 WFBot
 
-1. 安装 .NET Core 3.1[官方链接](https://docs.microsoft.com/zh-cn/dotnet/core/install/linux) 
+1. 安装 .NET Core 6.0[官方链接](https://docs.microsoft.com/zh-cn/dotnet/core/install/linux) 
 
 2. 进入 WFBot 文件夹
 
