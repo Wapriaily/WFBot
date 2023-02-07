@@ -9,9 +9,9 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./bots:/app/bots
-    deploy:
-      labels:
-        com.centurylinklabs.watchtower.enable: true
+      - ./plugin-libraries:/app/plugin-libraries
+    labels:
+      com.centurylinklabs.watchtower.enable: true
   wfbot:
     restart: unless-stopped
     image: trksteam/wfbot
@@ -22,8 +22,7 @@ services:
         - ./WFBotLogs:/app/WFBotLogs
         - ./WFOfflineResource:/app/WFOfflineResource
         - ./WFBotConfigs:/app/WFBotConfigs
-    deploy:
-      labels:
+    labels:
         com.centurylinklabs.watchtower.enable: true
   watchtower:
     restart: unless-stopped
