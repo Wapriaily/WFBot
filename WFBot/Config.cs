@@ -77,6 +77,8 @@ namespace WFBot
         public bool UseKraber = true;
         public bool CleanMemoryAfterImageRendering = false;
         public bool UseImagePGO = false;
+        public bool AtAllBroadcast = false;
+        public string BotMarketUUID = "";
 
         protected override void AfterUpdate()
         {
